@@ -92,7 +92,7 @@ class GeminiClient:
   "pose": "ポーズ",
   "background": "背景",
   "artistic_style": "芸術的スタイル",
-  "quality_assessment": "品質評価（1-10）",
+  "quality_assessment": 5,
   "suggestions": ["改善提案1", "改善提案2"],
   "danbooru_tags": {
     "positive": "positive tags",
@@ -102,6 +102,7 @@ class GeminiClient:
 
 ※ positiveタグにはキャラクターの特徴、表情、ポーズなど
 ※ negativeタグには品質を下げる要素（worst quality, low qualityなど）
+※ 必ず有効なJSON形式で、余分なテキストを含めずに返してください
 """
 
             response = self.vision_model.generate_content([
@@ -109,8 +110,23 @@ class GeminiClient:
                 image
             ])
 
+            # レスポンステキストからJSONを抽出
+            response_text = response.text.strip()
+
+            # マークダウンコードブロックからJSONを抽出
+            if "```json" in response_text:
+                start = response_text.find("```json") + 7
+                end = response_text.find("```", start)
+                if end != -1:
+                    response_text = response_text[start:end].strip()
+            elif "```" in response_text:
+                start = response_text.find("```") + 3
+                end = response_text.find("```", start)
+                if end != -1:
+                    response_text = response_text[start:end].strip()
+
             # JSONレスポンスをパース
-            return json.loads(response.text)
+            return json.loads(response_text)
 
         except Exception as e:
             print(f"詳細な画像分析エラー: {e}")
