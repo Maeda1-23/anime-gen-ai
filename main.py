@@ -130,8 +130,9 @@ def slide_workflow_mode():
     base_tags = extractor.get_base_tags_from_specpack(specpack)
     print(f"\n基本タグ: {', '.join(base_tags)}")
 
-    # VLMを使用するか
-    use_vl = input("VLMによる自動選択を使用しますか？ (y/N): ").strip().lower() == "y"
+    # VLMを使用するか（デフォルト: 使用する）
+    use_vl = True
+    print("VLMによる自動選択を使用します")
 
     # 変異プールの作成（CSVから読み込み）
     from genetic_algorithm import load_mutation_pool_csv, Population
@@ -332,8 +333,9 @@ def full_workflow_mode():
 
     print(f"基本タグ: {', '.join(base_tags)}")
 
-    # VLMを使用するか
-    use_vl = input("VLMによる自動選択を使用しますか？ (y/N): ").strip().lower() == "y"
+    # VLMを使用するか（デフォルト: 使用する）
+    use_vl = True
+    print("VLMによる自動選択を使用します")
 
     # クライアントの初期化
     comfyui_client = ComfyUIClient(config.comfyui_config)
