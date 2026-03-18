@@ -118,6 +118,14 @@ anime-gen-ai/
 └── temp/                # 一時ファイル
 ```
 
+## 使用モデル
+
+現在のモデル設定:
+
+- **AnythingXL_xl.safetensors**: アニメ特化のStable Diffusion XLモデル
+  - 配置場所: `C:\Users\T25ma\artwork\ComfyUI\models\checkpoints\AnythingXL_xl.safetensors`
+  - ComfyUIサーバー: `http://127.0.0.1:8188`
+
 ## モジュール詳細
 
 ### gemini_client.py
