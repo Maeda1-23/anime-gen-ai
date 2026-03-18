@@ -1,6 +1,6 @@
 # Gemini APIクライアント
 # 画像理解とテキスト生成のためのAPIラッパー
-# gemini-1.5-flashモデルを使用（無料枠で最も高性能）
+# gemini-3.1-flash-lite-previewモデルを使用（無料で最も高性能）
 
 import google.generativeai as genai
 from pathlib import Path
@@ -11,18 +11,18 @@ import json
 class GeminiClient:
     """Gemini APIの統合クライアント"""
 
-    def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, api_key: str, model_name: str = "gemini-3.1-flash-lite-preview"):
         """初期化
 
         Args:
             api_key: Google Gemini APIキー
-            model_name: 使用するモデル名（デフォルト: gemini-1.5-flash）
+            model_name: 使用するモデル名（デフォルト: gemini-3.1-flash-lite-preview）
         """
         self.api_key = api_key
         self.model_name = model_name
         genai.configure(api_key=api_key)
 
-        # テキスト生成用モデル（gemini-1.5-flashを使用）
+        # テキスト生成用モデル（gemini-3.1-flash-lite-previewを使用）
         self.text_model = genai.GenerativeModel(model_name)
         # 画像理解用モデルも同じモデル（ビジョン機能付き）
         self.vision_model = genai.GenerativeModel(model_name)
