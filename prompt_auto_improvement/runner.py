@@ -8,7 +8,7 @@ from PIL import Image
 
 from .vlm.base import VLMClient
 from .imggen.base import ImageGenerator
-from .config import SystemConfig
+from .config import SystemConfig, AppConfig
 from .io_manager import ExperimentIO
 from .utils import extract_json
 from .prompts import (
@@ -66,6 +66,20 @@ class ExperimentRunner:
         self.images_per_loop = images_per_loop
         self.prompt_format = prompt_format
         self.supports_negative = supports_negative
+
+    @classmethod
+    def from_app_config(cls, app_config: AppConfig, vlm: VLMClient, imggen: ImageGenerator) -> 'ExperimentRunner':
+        """AppConfigからExperimentRunnerを生成"""
+        return cls(
+            vlm=vlm,
+            imggen=imggen,
+            config=SystemConfig.from_app_config(app_config),
+            slide_dir=app_config.experiment.slides_dir,
+            max_loops=app_config.loop.max_loops,
+            images_per_loop=app_config.loop.images_per_loop,
+            prompt_format=app_config.image_generator.prompt_format,
+            supports_negative=app_config.image_generator.supports_negative_prompt,
+        )
 
     def run(self):
         """メインの実験ループを実行"""

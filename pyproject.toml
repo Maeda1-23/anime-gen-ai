@@ -1,0 +1,16 @@
+[project]
+name = "anime-gen-ai"
+version = "0.1.0"
+description = "アニメ制作自動化システム - VLMベースのプロンプト改善ループ"
+requires-python = ">=3.11"
+dependencies = [
+    "websocket-client>=1.8.0",
+    "google-generativeai>=0.8.0",
+    "python-dotenv>=1.0.0",
+    "Pillow>=10.0.0",
+    "pandas>=2.0.0",
+    "typing-extensions>=4.5.0",
+]
+
+[project.scripts]
+anime-gen-ai = "prompt_auto_improvement.cli:main"

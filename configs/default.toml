@@ -1,0 +1,36 @@
+# アニメ制作自動化システム - デフォルト設定
+
+[experiment]
+name = "default"
+slides_dir = "./slide_images"
+
+[output]
+root_dir = "./output"
+
+[loop]
+max_loops = 10
+images_per_loop = 3
+seed_policy = "random"   # "random" or "fixed"
+# master_seed = 12345    # seed_policy = "fixed" の場合に使用
+
+[image_generator]
+provider = "comfyui"
+prompt_format = "tags"             # "tags" or "natural"
+supports_negative_prompt = true
+supports_seed = true
+
+[image_generator.comfyui]
+server = "127.0.0.1:8188"
+workflow_json = "workflow.json"
+positive_prompt_node_id = "6"
+negative_prompt_node_id = "7"
+seed_node_id = "3"
+output_node_id = "9"
+timeout_sec = 600
+
+[vlm]
+provider = "gemini"
+
+[vlm.gemini]
+model = "gemini-3.1-flash-lite-preview"
+api_key_env = "GEMINI_API_KEY"
