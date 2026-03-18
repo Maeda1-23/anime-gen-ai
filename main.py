@@ -254,151 +254,80 @@ def slide_workflow_mode():
                 if critical_mismatches:
                     print(f"    重大な不一致: {critical_mismatches}")
 
-                results.append({
-                    "individual": indiv,
-                    "prompt": prompt,
-                    "seed": seed,
-                    "image_path": image_path,
-                    "total_score": total_score,
-                    "passed": passed,
-                    "selected": False,
-                    "character_appearance": character_appearance,
-                    "pose_composition_spatial": pose_composition_spatial,
-                    "background_environment_props": background_environment_props,
-                    "color_lighting_atmosphere": color_lighting_atmosphere,
-                    "good_points": good_points,
-                    "bad_points": bad_points,
-                    "critical_mismatches": critical_mismatches
-                })
-
             except Exception as e:
                 print(f"    [NG] エラー: {e}")
-                results.append({
-                    "individual": indiv,
-                    "prompt": prompt,
+                per_image_results.append({
+                    "m": m,
                     "seed": seed,
-                    "image_path": None,
+                    "image": f"gen_image_{m}.png",
                     "total_score": 0,
-                    "passed": False,
-                    "selected": False,
-                    "character_appearance": 0,
-                    "pose_composition_spatial": 0,
-                    "background_environment_props": 0,
-                    "color_lighting_atmosphere": 0,
-                    "good_points": [],
-                    "bad_points": ["エラー"],
-                    "critical_mismatches": []
+                    "scores": {
+                        "character_appearance": {"score": 0, "rationale": "エラー"},
+                        "pose_composition_spatial": {"score": 0, "rationale": "エラー"},
+                        "background_environment_props": {"score": 0, "rationale": "エラー"},
+                        "color_lighting_atmosphere": {"score": 0, "rationale": "エラー"}
+                    },
+                    "passed": False
                 })
 
-        # 選択フェーズ
-        survivors = []
+        # 平均スコアを計算
+        n = max(1, len(per_image_results))
+        avg_total = sum(r["total_score"] for r in per_image_results) / n
+        avg_character_appearance = sum(r["scores"].get("character_appearance", {}).get("score", 0) for r in per_image_results) / n
+        avg_pose_composition_spatial = sum(r["scores"].get("pose_composition_spatial", {}).get("score", 0) for r in per_image_results) / n
+        avg_background_environment_props = sum(r["scores"].get("background_environment_props", {}).get("score", 0) for r in per_image_results) / n
+        avg_color_lighting_atmosphere = sum(r["scores"].get("color_lighting_atmosphere", {}).get("score", 0) for r in per_image_results) / n
 
-        if use_vl:
-            # VLMによる自動選択
-            print("\nVLMによる自動選択を実行...")
-            sorted_results = sorted(results, key=lambda x: x["total_score"], reverse=True)
-            num_survivors = max(2, len(results) // 2)
+        avg_scores = {
+            "total": avg_total,
+            "character_appearance": avg_character_appearance,
+            "pose_composition_spatial": avg_pose_composition_spatial,
+            "background_environment_props": avg_background_environment_props,
+            "color_lighting_atmosphere": avg_color_lighting_atmosphere
+        }
 
-            # 合格条件をチェック
-            best_result = sorted_results[0]
-            if best_result["passed"]:
-                print(f"\n[合格条件を達成しました！]")
-                print(f"  合計スコア: {best_result['total_score']:.0f}/40")
-                print(f"  キャラクター: {best_result['character_appearance']:.0f}/10")
-                print(f"  ポーズ: {best_result['pose_composition_spatial']:.0f}/10")
-                print(f"  背景: {best_result['background_environment_props']:.0f}/10")
-                print(f"  色・光: {best_result['color_lighting_atmosphere']:.0f}/10")
-                return  # 合格した場合は終了
+        # 合格条件をチェック
+        passed = (
+            avg_character_appearance >= 7 and
+            avg_pose_composition_spatial >= 7 and
+            avg_background_environment_props >= 7 and
+            avg_color_lighting_atmosphere >= 7 and
+            avg_total >= 36
+        )
 
-            # tag_patchを適用して個体を修正
-            modified_survivors = []
-            for i in range(num_survivors):
-                result = sorted_results[i]
-                individual = result["individual"]
+        print(f"\nループ {loop_idx + 1} の結果:")
+        print(f"  平均スコア: {avg_total:.0f}/40")
+        print(f"  内訳: キャラクター{avg_character_appearance:.0f}/10, ポーズ{avg_pose_composition_spatial:.0f}/10, 背景{avg_background_environment_props:.0f}/10, 色・光{avg_color_lighting_atmosphere:.0f}/10")
+        print(f"  合格: {'はい' if passed else 'いいえ'}")
 
-                # VLMのフィードバックを考慮して個体を修正
-                modified_individual = individual
-                if result["good_points"]:
-                    # 良い点を維持
-                    modified_individual = individual
-                if result["bad_points"] or result["critical_mismatches"]:
-                    # 悪い点や重大な不一致がある場合は変異を適用
-                    modified_individual = individual.mutate()
+        if passed:
+            print(f"\n[合格条件を達成しました！]")
+            return  # 合格した場合は終了
 
-                modified_survivors.append(modified_individual)
+        # VLMによるプロンプト改善
+        print("\nVLMによるプロンプト改善を実行中...")
+        improvement = extractor.improve_prompt_with_vlm(
+            specpack=specpack,
+            current_positive=current_positive,
+            current_negative=current_negative,
+            per_image_results=per_image_results,
+            avg_scores=avg_scores,
+            passed=passed
+        )
 
-            survivors = modified_survivors
+        # 改善されたプロンプトを適用
+        current_positive = improvement["positive"]
+        current_negative = improvement["negative"]
 
-            for i in range(num_survivors):
-                sorted_results[i]["selected"] = True
+        print(f"改善されたプロンプト: {current_positive}")
+        if improvement["changes"]:
+            print(f"変更: {[f\"{c['type']}: {c['text']} ({c['reason']})\" for c in improvement['changes']]}")
+        if improvement["notes"]:
+            print(f"メモ: {improvement['notes']}")
+        if improvement["loop_summary"]:
+            print(f"サマリー: 成功={improvement['loop_summary'].get('main_successes', [])}, 失敗={improvement['loop_summary'].get('main_failures', [])}")
 
-            print(f"VLMが{num_survivors}個を選択しました")
-
-        else:
-            # インタラクティブ選択
-            print("\nどちらの画像が良いですか？")
-
-            for i in range(0, len(results), PAIR_SIZE):
-                if i + PAIR_SIZE > len(results):
-                    break
-
-                r1 = results[i]
-                r2 = results[i + 1]
-
-                print(f"\nペア {i // PAIR_SIZE}:")
-                print(f"  0: {r1['prompt']}")
-                print(f"     合計スコア: {r1['total_score']:.0f}/40")
-                print(f"     合格: {'はい' if r1['passed'] else 'いいえ'}")
-                print(f"     画像: {r1['image_path']}")
-                print(f"  1: {r2['prompt']}")
-                print(f"     合計スコア: {r2['total_score']:.0f}/40")
-                print(f"     合格: {'はい' if r2['passed'] else 'いいえ'}")
-                print(f"     画像: {r2['image_path']}")
-
-                choice = input("選択 (0-1, qで終了): ").strip().lower()
-
-                if choice == "q":
-                    print("終了します")
-                    return
-
-                if choice == "0":
-                    survivors.append(r1["individual"])
-                    r1["selected"] = True
-                elif choice == "1":
-                    survivors.append(r2["individual"])
-                    r2["selected"] = True
-
-        if not survivors:
-            print("生存者がいません")
-            break
-
-        # 履歴の記録
-        for i, result in enumerate(results):
-            workflow._add_history_entry(
-                generation=generation,
-                individual_id=i,
-                prompt=result["prompt"],
-                seed=result["seed"],
-                image_path=result["image_path"] or gen_dir / f"indiv_{i:02d}.png",
-                score=result["score"],
-                selected=result["selected"]
-            )
-
-        # 次世代の作成
-        population = population.create_next_generation(survivors)
-        print(f"\n次世代を{len(population.individuals)}個体作成しました")
-
-        # 継続確認
-        cont = input("次の世代に進みますか？ (y/N): ").strip().lower()
-        if cont != "y":
-            print("終了しました")
-            break
-
-    # サマリーの表示
-    summary = workflow.get_session_summary()
-    print("\n=== セッションサマリー ===")
-    for key, value in summary.items():
-        print(f"{key}: {value}")
+    print("\n最大ループ回数に達しました")
 
 def full_workflow_mode():
     """フルワークフローモード - 遺伝的アルゴリズムによる画像生成と自動改善"""
