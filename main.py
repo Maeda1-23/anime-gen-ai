@@ -201,13 +201,25 @@ def slide_workflow_mode():
                         current_prompt=prompt
                     )
                     score = evaluation.get("total_score", 0.5)
+                    breakdown = evaluation.get("breakdown", {})
+                    violations = evaluation.get("violations", [])
+                    tag_patch = evaluation.get("tag_patch", {})
                 except Exception as e:
                     print(f"    [警告] SpecPack評価失敗: {e}、デフォルト評価を使用")
                     analysis = gemini_client.analyze_image_detailed(image_path)
                     score = analysis.get("quality_assessment", 5.0) / 10.0
+                    breakdown = {}
+                    violations = []
+                    tag_patch = {}
 
                 print(f"    -> {image_path}")
                 print(f"    スコア: {score:.2f}/10")
+                if breakdown:
+                    print(f"    内訳: {breakdown}")
+                if violations:
+                    print(f"    違反: {violations}")
+                if tag_patch:
+                    print(f"    修正案: {tag_patch}")
 
                 results.append({
                     "individual": indiv,
