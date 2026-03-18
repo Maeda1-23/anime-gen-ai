@@ -114,7 +114,11 @@ def slide_workflow_mode():
 
     # SpecPackを抽出
     from spec_pack import SpecPackExtractor
-    extractor = SpecPackExtractor(gemini_client)
+    extractor = SpecPackExtractor(
+        gemini_client,
+        prompt_format="tags",
+        supports_negative=True
+    )
 
     print("\nスライドから仕様書を抽出中...")
     specpack = extractor.extract_from_slides(slide_files)
@@ -130,31 +134,13 @@ def slide_workflow_mode():
     base_tags = extractor.get_base_tags_from_specpack(specpack)
     print(f"\n基本タグ: {', '.join(base_tags)}")
 
-    # VLMを使用するか（デフォルト: 使用する）
-    use_vl = True
-    print("VLMによる自動選択を使用します")
-
-    # 変異プールの作成（CSVから読み込み）
-    from genetic_algorithm import load_mutation_pool_csv, Population
-    mutation_pool = load_mutation_pool_csv()
-
-    # 初期個体群の作成
-    population = Population.create_random_population(
-        size=POP_SIZE,
-        base_tags=base_tags,
-        mutation_pool=mutation_pool,
-        quality_suffix=QUALITY
-    )
-
-    print(f"\n初期個体群: {POP_SIZE}個体を作成しました")
-
     # セッションの作成
     from workflow_manager import WorkflowManager
     workflow = WorkflowManager(
         client=gemini_client,
         base_tags=base_tags,
-        mutation_pool=mutation_pool,
-        population_size=POP_SIZE,
+        mutation_pool={},
+        population_size=1,
         pair_size=PAIR_SIZE,
         quality_suffix=QUALITY
     )
@@ -167,30 +153,38 @@ def slide_workflow_mode():
         json.dump(specpack.to_dict(), f, indent=2, ensure_ascii=False)
     print(f"SpecPackを保存しました: {specpack_path}")
 
-    # 進化的ループ
-    max_generations = 10
-    for generation in range(max_generations):
-        workflow.current_generation = generation
-        gen_dir = workflow.session_dir / f"gen_{generation:03d}"
-        gen_dir.mkdir(parents=True, exist_ok=True)
+    # VLMベースのプロンプト改善ループ
+    max_loops = 10
+    images_per_loop = 3
 
-        print(f"\n--- 第{generation + 1}世代 ---")
+    # 初期プロンプト
+    current_positive = ", ".join(base_tags) + f", {QUALITY}"
+    current_negative = NEGATIVE_PROMPT
+
+    for loop_idx in range(max_loops):
+        workflow.current_generation = loop_idx
+        loop_dir = workflow.session_dir / f"loop_{loop_idx:03d}"
+        loop_dir.mkdir(parents=True, exist_ok=True)
+
+        print(f"\n--- ループ {loop_idx + 1}/{max_loops} ---")
+        print(f"現在のプロンプト: {current_positive}")
 
         # 画像生成
         results = []
-        for i, indiv in enumerate(population.individuals):
-            prompt = indiv.get_prompt()
+        per_image_results = []
+
+        for m in range(images_per_loop):
             seed = random.randint(0, 2**32 - 1)
 
-            print(f"[{i}] 生成中: {prompt}")
+            print(f"[{m}] 生成中...")
 
             try:
                 # ComfyUIで画像生成
                 image_path = comfyui_client.generate_image(
-                    positive_prompt=prompt,
-                    negative_prompt=NEGATIVE_PROMPT,
+                    positive_prompt=current_positive,
+                    negative_prompt=current_negative,
                     seed=seed,
-                    output_dir=gen_dir
+                    output_dir=loop_dir
                 )
 
                 # Geminiで画像分析（SpecPackに基づいた評価）
@@ -198,7 +192,7 @@ def slide_workflow_mode():
                     evaluation = extractor.judge_image_with_specpack(
                         image_path=image_path,
                         specpack=specpack,
-                        current_prompt=prompt
+                        current_prompt=current_positive
                     )
                     total_score = evaluation.get("total", 0)
                     scores = evaluation.get("scores", {})
@@ -212,6 +206,16 @@ def slide_workflow_mode():
                     pose_composition_spatial = scores.get("pose_composition_spatial", {}).get("score", 0)
                     background_environment_props = scores.get("background_environment_props", {}).get("score", 0)
                     color_lighting_atmosphere = scores.get("color_lighting_atmosphere", {}).get("score", 0)
+
+                    # 各画像の評価結果を記録
+                    per_image_results.append({
+                        "m": m,
+                        "seed": seed,
+                        "image": f"gen_image_{m}.png",
+                        "total_score": total_score,
+                        "scores": scores,
+                        "passed": passed
+                    })
                 except Exception as e:
                     print(f"    [警告] SpecPack評価失敗: {e}、デフォルト評価を使用")
                     analysis = gemini_client.analyze_image_detailed(image_path)
@@ -224,6 +228,21 @@ def slide_workflow_mode():
                     good_points = []
                     bad_points = ["解析失敗"]
                     critical_mismatches = []
+
+                    # 各画像の評価結果を記録
+                    per_image_results.append({
+                        "m": m,
+                        "seed": seed,
+                        "image": f"gen_image_{m}.png",
+                        "total_score": total_score,
+                        "scores": {
+                            "character_appearance": {"score": character_appearance, "rationale": "解析失敗"},
+                            "pose_composition_spatial": {"score": pose_composition_spatial, "rationale": "解析失敗"},
+                            "background_environment_props": {"score": background_environment_props, "rationale": "解析失敗"},
+                            "color_lighting_atmosphere": {"score": color_lighting_atmosphere, "rationale": "解析失敗"}
+                        },
+                        "passed": passed
+                    })
 
                 print(f"    -> {image_path}")
                 print(f"    スコア: {total_score:.0f}/40 (合格: {'はい' if passed else 'いいえ'})")

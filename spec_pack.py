@@ -41,13 +41,17 @@ class SpecPack:
 class SpecPackExtractor:
     """スライド画像からSpecPackを抽出するクラス"""
 
-    def __init__(self, gemini_client):
+    def __init__(self, gemini_client, prompt_format: str = "tags", supports_negative: bool = True):
         """初期化
 
         Args:
             gemini_client: GeminiClientインスタンス
+            prompt_format: プロンプト形式 ("tags" or "natural")
+            supports_negative: ネガティブプロンプトをサポートするか
         """
         self.client = gemini_client
+        self.prompt_format = prompt_format
+        self.supports_negative = supports_negative
 
     def extract_from_slides(
         self,
@@ -410,3 +414,145 @@ SpecPack(JSON):
                 seen.add(t)
 
         return out
+
+    def improve_prompt_with_vlm(
+        self,
+        specpack: SpecPack,
+        current_positive: str,
+        current_negative: Optional[str],
+        per_image_results: List[Dict],
+        avg_scores: Dict,
+        passed: bool
+    ) -> Dict[str, Optional[str]]:
+        """VLMを使用してプロンプトを改善
+
+        Args:
+            specpack: SpecPackオブジェクト
+            current_positive: 現在のポジティブプロンプト
+            current_negative: 現在のネガティブプロンプト
+            per_image_results: 各画像の評価結果リスト
+            avg_scores: 平均スコア
+            passed: 合格しているか
+
+        Returns:
+            改善されたプロンプトの辞書 {"positive": str, "negative": str|None}
+        """
+        spec_json = _compact_json(specpack.to_dict())
+        per_image_json = _compact_json(per_image_results)
+        avg_scores_json = _compact_json(avg_scores)
+
+        pass_note = (
+            "合格条件を達成しました。重大な不一致が残っていない限り、プロンプトを変更しないでください。"
+            if passed
+            else "合格条件を達成していません。チェックリストに従うようにプロンプトを改善してください。"
+        )
+
+        neg_rule = ""
+        if self.supports_negative:
+            neg_rule = "- ネガティブプロンプトを調整しても構いません。\n"
+        else:
+            neg_rule = "- ネガティブプロンプトは出力しないでください（nullに設定）。\n"
+
+        format_hint = ""
+        if self.prompt_format == "tags":
+            format_hint = (
+                "プロンプト形式要件:\n"
+                "- ポジティブプロンプトをカンマ区切りのタグで出力してください。\n"
+                "- 完全な文章を使用しないでください。\n"
+                "- ピリオドを使用しないでください。\n"
+            )
+        else:
+            format_hint = (
+                "プロンプト形式要件:\n"
+                "- ポジティブプロンプトを画像生成に適した自然な英語で出力してください。\n"
+            )
+
+        prompt = f"""
+あなたはプロンプトエンジニアリングとアートディレクションの専門家です。
+
+以下の情報が提供されます:
+- 仕様書から作成されたチェックリスト (JSON)
+- 現在の生成プロンプト
+- 各画像の評価結果 (JSONリスト)
+- 平均スコア (JSON)
+
+目標:
+- チェックリストへの準拠を改善するために、次の改善されたプロンプト（ポジティブとネガティブ）を提案してください。
+- チェックリストでサポートされていない創造的な詳細を追加しないでください。
+- 欠けているまたは繰り返し失敗している視覚的制約を強調してください。
+- 矛盾を引き起こす用語を削除または緩和してください。
+
+{pass_note}
+
+{format_hint}
+
+チェックリスト JSON:
+{spec_json}
+
+現在のポジティブプロンプト:
+{current_positive}
+
+現在のネガティブプロンプト:
+{current_negative or "なし"}
+
+平均スコア:
+{avg_scores_json}
+
+各画像の評価:
+{per_image_json}
+
+有効なJSONのみを出力してください。
+以下のJSONスキーマを使用してください:
+
+{{
+  "loop_summary": {{
+    "main_successes": ["成功点1", "成功点2"],
+    "main_failures": ["失敗点1", "失敗点2"]
+  }},
+  "next_prompt": {{
+    "positive": "改善されたポジティブプロンプト",
+    "negative": "改善されたネガティブプロンプト" | null
+  }},
+  "changes": [
+    {{"type": "add|remove|modify", "text": "変更内容", "reason": "理由"}}
+  ],
+  "notes": "追加のメモ"
+}}
+
+{neg_rule}
+"""
+
+        # Geminiでプロンプト改善（温度0で決定的）
+        response_text = self.client.generate_text(prompt, temperature=0.0)
+        json_text = self._extract_json(response_text)
+
+        if json_text:
+            improvement = json.loads(json_text)
+            next_prompt = improvement.get("next_prompt", {})
+            positive = next_prompt.get("positive", current_positive)
+            negative = next_prompt.get("negative", current_negative)
+
+            # ネガティブプロンプトがサポートされていない場合はNoneに設定
+            if not self.supports_negative:
+                negative = None
+
+            return {
+                "positive": positive,
+                "negative": negative,
+                "changes": improvement.get("changes", []),
+                "notes": improvement.get("notes", ""),
+                "loop_summary": improvement.get("loop_summary", {})
+            }
+        else:
+            # デフォルト改善（元のプロンプトを返す）
+            return {
+                "positive": current_positive,
+                "negative": current_negative if self.supports_negative else None,
+                "changes": [],
+                "notes": "プロンプト改善に失敗しました。元のプロンプトを維持します。",
+                "loop_summary": {
+                    "main_successes": [],
+                    "main_failures": ["プロンプト改善に失敗"]
+                }
+            }
+
