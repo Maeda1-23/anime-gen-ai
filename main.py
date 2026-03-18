@@ -256,7 +256,7 @@ def main():
     """メイン関数"""
     print("アニメ制作自動化システムを起動します...")
     print("Gemini APIを活用したアニメ制作ワークフロー自動化システム")
-    print("使用モデル: gemini-2.0-flash-exp")
+    print("使用モデル: gemini-1.5-flash")
 
     # 環境変数の読み込み
     if load_dotenv:
