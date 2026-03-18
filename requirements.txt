@@ -1,6 +1,9 @@
 # 依存パッケージ
 # Python 3.10以上が必要です
 
+# WebSocket通信
+websocket-client>=1.8.0
+
 # Gemini APIクライアント
 google-generativeai>=0.5.0
 
