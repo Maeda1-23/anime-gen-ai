@@ -1,98 +1,178 @@
 # アニメ制作自動化システムのメインエントリーポイント
 
 import os
-import random
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any
-import json
+import sys
 
-# 画像生成と理解用のクラス
-class GeminiImageGenerator:
-    """Gemini APIを使用した画像生成クラス"""
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    print("警告: python-dotenvがインストールされていません")
+    print("インストールコマンド: pip install python-dotenv")
+    load_dotenv = None
 
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        # TODO: Gemini APIの初期化を実装
-
-    def generate_image(self, prompt: str, output_path: Path) -> Path:
-        """テキストプロンプトから画像を生成する"""
-        # TODO: 実装
-        print(f"画像生成: {prompt} -> {output_path}")
-        return output_path
-
-class GeminiImageAnalyzer:
-    """Gemini APIを使用した画像理解クラス"""
-
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        # TODO: Gemini APIの初期化を実装
-
-    def analyze_image(self, image_path: Path) -> Dict[str, Any]:
-        """画像を分析して説明を生成する"""
-        # TODO: 実装
-        print(f"画像分析: {image_path}")
-        return {"description": "画像分析結果"}
+from gemini_client import GeminiClient, load_api_key
 
 def create_session_dir(base_dir: Path) -> Path:
-    """セッション用のディレクトリを作成"""
+    """セッション用のディレクトリを作成
+
+    Args:
+        base_dir: ベースディレクトリ
+
+    Returns:
+        セッションディレクトリパス
+    """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_dir = base_dir / f"session_{timestamp}"
     session_dir.mkdir(parents=True, exist_ok=True)
     return session_dir
 
-def load_environment_variables() -> Dict[str, str]:
-    """環境変数を読み込む"""
-    env_vars = {}
-    env_file = Path(".env")
+def test_gemini_connection(api_key: str) -> bool:
+    """Gemini API接続をテスト
 
-    if env_file.exists():
-        with open(env_file, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    env_vars[key.strip()] = value.strip()
+    Args:
+        api_key: Google Gemini APIキー
 
-    return env_vars
+    Returns:
+        接続成功時はTrue、失敗時はFalse
+    """
+    print("Gemini API接続テスト中...")
+
+    try:
+        client = GeminiClient(api_key)
+        result = client.test_connection()
+
+        if result:
+            print("✓ Gemini API接続成功")
+            return True
+        else:
+            print("✗ Gemini API接続失敗")
+            return False
+
+    except Exception as e:
+        print(f"✗ エラーが発生しました: {e}")
+        return False
+
+def interactive_demo(client: GeminiClient):
+    """対話的なデモモード
+
+    Args:
+        client: GeminiClientインスタンス
+    """
+    print("\n=== アニメ制作自動化システム - デモモード ===")
+
+    while True:
+        print("\n選択してください:")
+        print("1. テキスト生成テスト")
+        print("2. プロンプト提案テスト")
+        print("3. 画像分析テスト（画像パスを指定）")
+        print("4. 終了")
+
+        choice = input("選択 (1-4): ").strip()
+
+        if choice == "1":
+            test_text_generation(client)
+        elif choice == "2":
+            test_prompt_suggestions(client)
+        elif choice == "3":
+            test_image_analysis(client)
+        elif choice == "4":
+            print("終了します")
+            break
+        else:
+            print("無効な選択です")
+
+def test_text_generation(client: GeminiClient):
+    """テキスト生成機能のテスト"""
+    print("\n--- テキスト生成テスト ---")
+
+    prompt = input("プロンプトを入力: ").strip()
+    if not prompt:
+        prompt = "アニメキャラクターの特徴について説明してください"
+
+    try:
+        result = client.generate_text(prompt)
+        print(f"\n生成結果:\n{result}")
+    except Exception as e:
+        print(f"エラー: {e}")
+
+def test_prompt_suggestions(client: GeminiClient):
+    """プロンプト提案機能のテスト"""
+    print("\n--- プロンプト提案テスト ---")
+
+    description = input("キャラクターの説明を入力: ").strip()
+    if not description:
+        description = "可愛いアニメの女の子、ショートヘア、制服"
+
+    try:
+        suggestions = client.get_image_prompt_suggestions(description)
+        print(f"\n提案されたプロンプト:")
+        print(f"Positive: {suggestions['positive']}")
+        print(f"Negative: {suggestions['negative']}")
+    except Exception as e:
+        print(f"エラー: {e}")
+
+def test_image_analysis(client: GeminiClient):
+    """画像分析機能のテスト"""
+    print("\n--- 画像分析テスト ---")
+
+    image_path = input("画像パスを入力: ").strip()
+    if not image_path:
+        print("パスが入力されませんでした")
+        return
+
+    path = Path(image_path)
+    if not path.exists():
+        print(f"ファイルが見つかりません: {image_path}")
+        return
+
+    prompt = input("分析用プロンプトを入力（Enterでデフォルト）: ").strip()
+    if not prompt:
+        prompt = "この画像を詳しく説明してください"
+
+    try:
+        result = client.analyze_image(path, prompt)
+        print(f"\n分析結果:\n{result}")
+    except Exception as e:
+        print(f"エラー: {e}")
 
 def main():
     """メイン関数"""
     print("アニメ制作自動化システムを起動します...")
 
     # 環境変数の読み込み
-    env_vars = load_environment_variables()
-    api_key = env_vars.get("GEMINI_API_KEY", "")
+    if load_dotenv:
+        load_dotenv()
+
+    # APIキーの取得
+    api_key = load_api_key()
 
     if not api_key:
         print("エラー: .envファイルにGEMINI_API_KEYが設定されていません")
-        print("以下の手順でAPIキーを設定してください:")
-        print("1. Google Cloud ConsoleでGemini APIキーを取得")
-        print("2. .envファイルを作成して GEMINI_API_KEY=your_api_key と記述")
+        print("\n以下の手順でAPIキーを設定してください:")
+        print("1. Google Cloud Console (https://console.cloud.google.com/) にアクセス")
+        print("2. プロジェクトを作成または選択")
+        print("3. 'APIs & Services' > 'Credentials' に移動")
+        print("4. 'Create Credentials' > 'API Key' をクリック")
+        print("5. 生成されたAPIキーをコピー")
+        print("6. .envファイルに GEMINI_API_KEY=your_api_key と記述")
+        return
+
+    # API接続テスト
+    if not test_gemini_connection(api_key):
+        print("\nAPI接続に失敗しました。APIキーを確認してください。")
         return
 
     # セッションディレクトリの作成
     session_dir = create_session_dir(Path("output"))
     print(f"セッションディレクトリ: {session_dir}")
 
-    # 画像生成と分析クラスの初期化
-    generator = GeminiImageGenerator(api_key)
-    analyzer = GeminiImageAnalyzer(api_key)
+    # Geminiクライアントの初期化
+    client = GeminiClient(api_key)
 
-    # 簡単なテスト
-    test_prompt = "1girl, solo, anime style"
-    test_output = session_dir / "test_output.png"
-
-    try:
-        generated_image = generator.generate_image(test_prompt, test_output)
-        analysis = analyzer.analyze_image(generated_image)
-
-        print("\nテスト完了:")
-        print(f"生成画像: {generated_image}")
-        print(f"分析結果: {analysis}")
-
-    except Exception as e:
-        print(f"エラーが発生しました: {e}")
+    # 対話的なデモモード
+    interactive_demo(client)
 
 if __name__ == "__main__":
     main()
