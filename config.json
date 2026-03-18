@@ -1,0 +1,12 @@
+{
+  "comfyui": {
+    "server_address": "127.0.0.1:8188",
+    "workflow_json_path": "workflow.json"
+  },
+  "output_dir": "output",
+  "image_width": 1024,
+  "image_height": 1024,
+  "default_steps": 28,
+  "default_cfg": 7.0,
+  "default_sampler": "euler_ancestral"
+}
