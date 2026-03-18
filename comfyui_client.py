@@ -16,7 +16,7 @@ import websocket
 class ComfyUIConfig:
     """ComfyUIの設定"""
     server_address: str = "127.0.0.1:8188"
-    workflow_json_path: str = "C:\\Users\\T25ma\\artwork\\ComfyUI\\workflows\\illustrious_template.json"
+    workflow_json_path: str = "workflow.json"
     positive_prompt_node_id: str = "6"
     positive_prompt_input_key: str = "text"
     negative_prompt_node_id: str = "7"
