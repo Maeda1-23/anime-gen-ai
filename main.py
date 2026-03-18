@@ -321,7 +321,8 @@ def slide_workflow_mode():
 
         print(f"改善されたプロンプト: {current_positive}")
         if improvement["changes"]:
-            print(f"変更: {[f\"{c['type']}: {c['text']} ({c['reason']})\" for c in improvement['changes']]}")
+            changes_str = ", ".join([f"{c['type']}: {c['text']} ({c['reason']})" for c in improvement['changes']])
+            print(f"変更: {changes_str}")
         if improvement["notes"]:
             print(f"メモ: {improvement['notes']}")
         if improvement["loop_summary"]:
