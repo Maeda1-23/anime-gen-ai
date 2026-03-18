@@ -193,9 +193,18 @@ def slide_workflow_mode():
                     output_dir=gen_dir
                 )
 
-                # Geminiで画像分析
-                analysis = gemini_client.analyze_image_detailed(image_path)
-                score = analysis.get("quality_assessment", 5.0) / 10.0
+                # Geminiで画像分析（SpecPackに基づいた評価）
+                try:
+                    evaluation = extractor.judge_image_with_specpack(
+                        image_path=image_path,
+                        specpack=specpack,
+                        current_prompt=prompt
+                    )
+                    score = evaluation.get("total_score", 0.5)
+                except Exception as e:
+                    print(f"    [警告] SpecPack評価失敗: {e}、デフォルト評価を使用")
+                    analysis = gemini_client.analyze_image_detailed(image_path)
+                    score = analysis.get("quality_assessment", 5.0) / 10.0
 
                 print(f"    -> {image_path}")
                 print(f"    スコア: {score:.2f}/10")
