@@ -2,7 +2,6 @@
 
 import os
 from pathlib import Path
-from datetime import datetime
 import sys
 
 try:
@@ -13,20 +12,7 @@ except ImportError:
     load_dotenv = None
 
 from gemini_client import GeminiClient, load_api_key
-
-def create_session_dir(base_dir: Path) -> Path:
-    """セッション用のディレクトリを作成
-
-    Args:
-        base_dir: ベースディレクトリ
-
-    Returns:
-        セッションディレクトリパス
-    """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    session_dir = base_dir / f"session_{timestamp}"
-    session_dir.mkdir(parents=True, exist_ok=True)
-    return session_dir
+from workflow_manager import run_interactive_workflow
 
 def test_gemini_connection(api_key: str) -> bool:
     """Gemini API接続をテスト
@@ -60,16 +46,17 @@ def interactive_demo(client: GeminiClient):
     Args:
         client: GeminiClientインスタンス
     """
-    print("\n=== アニメ制作自動化システム - デモモード ===")
+    print("\n=== アニメ制作自動化システム - メニュー ===")
 
     while True:
         print("\n選択してください:")
         print("1. テキスト生成テスト")
         print("2. プロンプト提案テスト")
         print("3. 画像分析テスト（画像パスを指定）")
-        print("4. 終了")
+        print("4. 進化的ワークフロー開始")
+        print("5. 終了")
 
-        choice = input("選択 (1-4): ").strip()
+        choice = input("選択 (1-5): ").strip()
 
         if choice == "1":
             test_text_generation(client)
@@ -78,6 +65,8 @@ def interactive_demo(client: GeminiClient):
         elif choice == "3":
             test_image_analysis(client)
         elif choice == "4":
+            run_interactive_workflow(client)
+        elif choice == "5":
             print("終了します")
             break
         else:
@@ -140,6 +129,7 @@ def test_image_analysis(client: GeminiClient):
 def main():
     """メイン関数"""
     print("アニメ制作自動化システムを起動します...")
+    print("Gemini APIを活用したアニメ制作ワークフロー自動化システム")
 
     # 環境変数の読み込み
     if load_dotenv:
@@ -149,7 +139,7 @@ def main():
     api_key = load_api_key()
 
     if not api_key:
-        print("エラー: .envファイルにGEMINI_API_KEYが設定されていません")
+        print("\nエラー: .envファイルにGEMINI_API_KEYが設定されていません")
         print("\n以下の手順でAPIキーを設定してください:")
         print("1. Google Cloud Console (https://console.cloud.google.com/) にアクセス")
         print("2. プロジェクトを作成または選択")
@@ -157,16 +147,16 @@ def main():
         print("4. 'Create Credentials' > 'API Key' をクリック")
         print("5. 生成されたAPIキーをコピー")
         print("6. .envファイルに GEMINI_API_KEY=your_api_key と記述")
+        print("\nAPIキーの取得方法:")
+        print("- Google AI Studio (https://makersuite.google.com/app/apikey) も使用可能です")
+        print("- 無料枠で利用可能です")
         return
 
     # API接続テスト
     if not test_gemini_connection(api_key):
         print("\nAPI接続に失敗しました。APIキーを確認してください。")
+        print("詳細なエラーメッセージを確認の上、再度試してください。")
         return
-
-    # セッションディレクトリの作成
-    session_dir = create_session_dir(Path("output"))
-    print(f"セッションディレクトリ: {session_dir}")
 
     # Geminiクライアントの初期化
     client = GeminiClient(api_key)
