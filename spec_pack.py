@@ -3,8 +3,20 @@
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
+
+
+def _compact_json(obj: Any) -> str:
+    """JSONを一貫した形式に変換（キャッシュや再現性のために空白を削除）
+
+    Args:
+        obj: JSON化するオブジェクト
+
+    Returns:
+        一貫した形式のJSON文字列
+    """
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
 @dataclass
@@ -116,10 +128,18 @@ class SpecPackExtractor:
 - スライドの宛名/会社名/管理ID/ページ番号等は prohibited に寄せる
 - prompt_seed.positive_tags はDanbooru風の英語タグに寄せて短く
 - prompt_seed.negative_tags は文字混入防止を中心に短く
+
+# スコア基準（厳格に評価）
+- 各項目は0.0〜1.0の範囲で評価
+- must項目が1つでも欠けている場合は重大な減点（0.2以下）
+- prohibited項目が1つでもある場合はanti_noiseを0.0とする
+- 品質が非常に良い場合でも1.0を超えることはない
+- 平均的な品質は0.4〜0.6程度
+- 優れた品質は0.7〜0.8程度
 """
 
-        # GeminiでJSONを生成
-        response_text = self.client.generate_text(prompt, temperature=0.3)
+        # GeminiでJSONを生成（温度0で決定的）
+        response_text = self.client.generate_text(prompt, temperature=0.0)
         json_text = self._extract_json(response_text)
 
         if json_text:
@@ -245,7 +265,7 @@ class SpecPackExtractor:
         Returns:
             評価結果の辞書
         """
-        spec_json = json.dumps(specpack.to_dict(), ensure_ascii=False, indent=2)
+        spec_json = _compact_json(specpack.to_dict())
 
         prompt = f"""
 あなたは画像生成の検査官です。与えられたSpecPackを唯一の正解基準として、画像を採点し、修正案を返してください。
@@ -280,10 +300,19 @@ SpecPack(JSON):
 - violations は最大8件、短く
 - tag_patch は「最小修正」で。追加/削除/置換のどれかは必ず入れる
 - prohibited が破られている（文字/ロゴ/透かし等）場合は anti_noise を下げ、remove/negative寄りの修正を提案
+
+# スコア基準（厳格に評価）
+- 各項目は0.0〜1.0の範囲で評価
+- must項目が1つでも欠けている場合は重大な減点（0.2以下）
+- prohibited項目が1つでもある場合はanti_noiseを0.0とする
+- 品質が非常に良い場合でも1.0を超えることはない
+- 平均的な品質は0.4〜0.6程度
+- 優れた品質は0.7〜0.8程度
+- 完璧な品質は0.9〜1.0程度
 """
 
-        # Geminiで評価
-        response_text = self.client.generate_text(prompt, temperature=0.3)
+        # Geminiで評価（温度0で決定的）
+        response_text = self.client.generate_text(prompt, temperature=0.0)
         json_text = self._extract_json(response_text)
 
         if json_text:
