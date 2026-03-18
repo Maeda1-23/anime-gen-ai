@@ -284,6 +284,41 @@ class Population:
         return Population(new_individuals)
 
 # ユーティリティ関数
+def load_mutation_pool_csv(pool_path: Path = Path("prompt_tag_pool.csv")) -> Dict[str, List[str]]:
+    """CSVファイルから変異プールを読み込む
+
+    Args:
+        pool_path: CSVファイルのパス
+
+    Returns:
+        カテゴリごとのタグリスト
+    """
+    import csv
+
+    pool: Dict[str, List[str]] = {}
+
+    try:
+        with open(pool_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                tag = row.get("tag", "").strip()
+                category = row.get("category", "").strip()
+
+                if tag and category:
+                    if category not in pool:
+                        pool[category] = []
+                    pool[category].append(tag)
+
+        print(f"タグプールをCSVから読み込みました: {pool_path}")
+        print(f"カテゴリ数: {len(pool)}, タグ数: {sum(len(tags) for tags in pool.values())}")
+
+        return pool
+
+    except FileNotFoundError:
+        print(f"警告: タグプールCSVが見つかりません: {pool_path}")
+        print("デフォルトのタグプールを使用します")
+        return create_default_mutation_pool()
+
 def create_default_mutation_pool() -> Dict[str, List[str]]:
     """デフォルトの変異プールを作成
 

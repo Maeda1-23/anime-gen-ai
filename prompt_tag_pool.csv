@@ -1,0 +1,279 @@
+id,tag,category
+0,cinematic lighting,lighting
+1,natural light,lighting
+2,volumetric lighting,lighting
+3,backlight,lighting
+4,soft lighting,lighting
+5,dynamic lighting,lighting
+6,rim light,lighting
+7,studio lighting,lighting
+8,sunlight,lighting
+9,dynamic angle,camera
+10,dutch angle,camera
+11,from below,camera
+12,from above,camera
+13,wide shot,camera
+14,close-up,camera
+15,portrait,camera
+16,fisheye,camera
+17,depth of field,camera
+18,vibrant colors,style
+19,flat color,style
+20,monochrome,style
+21,detailed eyes,style
+22,intricate details,style
+23,shiny skin,style
+24,sketch,style
+25,thick outline,style
+26,wind,atmosphere
+27,floating hair,atmosphere
+28,particles,atmosphere
+29,lens flare,atmosphere
+30,cyberpunk,atmosphere
+31,fantasy,atmosphere
+32,sci-fi,atmosphere
+33,dreamy,atmosphere
+34,standing,pose
+35,sitting,pose
+36,kneeling,pose
+37,crouching,pose
+38,lying down,pose
+39,jumping,pose
+40,running,pose
+41,walking,pose
+42,arms crossed,pose
+43,hands on hips,pose
+44,arms behind back,pose
+45,hands behind head,pose
+46,one hand raised,pose
+47,both hands raised,pose
+48,looking over shoulder,pose
+49,facing camera,pose
+50,looking away,pose
+51,side view,pose
+52,3/4 view,pose
+53,full body,pose
+54,half-body,pose
+55,close-up body,pose
+56,low-angle shot,angle
+57,high-angle shot,angle
+58,bird’s-eye view,angle
+59,worm’s-eye view,angle
+60,over-the-shoulder view,angle
+61,tilted angle,angle
+62,looking up,angle
+63,looking down,angle
+64,1girl,character
+65,1boy,character
+66,solo,character
+67,couple,character
+68,group of two,character
+69,long hair,character
+70,short hair,character
+71,medium hair,character
+72,wavy hair,character
+73,straight hair,character
+74,blonde hair,character
+75,silver hair,character
+76,black hair,character
+77,brown hair,character
+78,red hair,character
+79,blue hair,character
+80,pink hair,character
+81,green hair,character
+82,white hair,character
+83,blue eyes,character
+84,green eyes,character
+85,red eyes,character
+86,golden eyes,character
+87,heterochromia,character
+88,slender,character
+89,athletic,character
+90,petite,character
+91,tall,character
+92,mature,character
+93,casual clothing,clothing_detail
+94,school uniform,clothing_detail
+95,fantasy armor,clothing_detail
+96,medieval clothes,clothing_detail
+97,modern clothes,clothing_detail
+98,summer dress,clothing_detail
+99,winter coat,clothing_detail
+100,kimono,clothing_detail
+101,T-shirt,clothing_detail
+102,shirt,clothing_detail
+103,blouse,clothing_detail
+104,hoodie,clothing_detail
+105,jacket,clothing_detail
+106,coat,clothing_detail
+107,parka,clothing_detail
+108,dress,clothing_detail
+109,gown,clothing_detail
+110,sweater,clothing_detail
+111,cardigan,clothing_detail
+112,corset,clothing_detail
+113,vest,clothing_detail
+114,skirt,clothing_detail
+115,mini skirt,clothing_detail
+116,long skirt,clothing_detail
+117,shorts,clothing_detail
+118,pants,clothing_detail
+119,jeans,clothing_detail
+120,cargo pants,clothing_detail
+121,leggings,clothing_detail
+122,boots,clothing_detail
+123,heels,clothing_detail
+124,sandals,clothing_detail
+125,sneakers,clothing_detail
+126,stockings,clothing_detail
+127,thigh-high socks,clothing_detail
+128,lace trim,clothing_detail
+129,frilled,clothing_detail
+130,ribbon tied,clothing_detail
+131,belted,clothing_detail
+132,corseted,clothing_detail
+133,hooded,clothing_detail
+134,fur-lined,clothing_detail
+135,leather,clothing_detail
+136,denim,clothing_detail
+137,silk,clothing_detail
+138,lace,clothing_detail
+139,leather jacket,clothing_detail
+140,denim jacket,clothing_detail
+141,armor pieces,clothing_detail
+142,metal armor,clothing_detail
+143,chainmail,clothing_detail
+144,boots (armor),clothing_detail
+145,uniform,clothing_detail
+146,military uniform,clothing_detail
+147,suit,clothing_detail
+148,formal dress,clothing_detail
+149,evening gown,clothing_detail
+150,streetwear,clothing_detail
+151,cape,clothing_detail
+152,cloak,clothing_detail
+153,scarf,clothing_detail
+154,gloves (clothing),clothing_detail
+155,belt pouch,clothing_detail
+156,pocket watch,accessory
+157,glasses,accessory
+158,sunglasses,accessory
+159,earrings,accessory
+160,necklace,accessory
+161,pendant,accessory
+162,bracelet,accessory
+163,ring,accessory
+164,hat,accessory
+165,beanie,accessory
+166,hood,accessory
+167,scarf (acc),accessory
+168,bandana,accessory
+169,hairpin,accessory
+170,bow,accessory
+171,hair ornament,accessory
+172,backpack,accessory
+173,bag,accessory
+174,satchel,accessory
+175,pouch,accessory
+176,weapon sword,accessory
+177,weapon dagger,accessory
+178,weapon staff,accessory
+179,weapon bow,accessory
+180,book,accessory
+181,scroll,accessory
+182,map,accessory
+183,smartphone,accessory
+184,camera device,accessory
+185,lantern,accessory
+186,umbrella,accessory
+187,parasol,accessory
+188,fan,accessory
+189,mask,accessory
+190,glasses (alternative),accessory
+191,smiling,expression
+192,smiling brightly,expression
+193,happy,expression
+194,cheerful,expression
+195,joyful,expression
+196,grinning,expression
+197,wide-open eyes,expression
+198,sparkling eyes,expression
+199,bright eyes,expression
+200,serious,expression
+201,determined,expression
+202,confident,expression
+203,focused,expression
+204,resolute,expression
+205,sad,expression
+206,downcast,expression
+207,teary eyes,expression
+208,crying,expression
+209,melancholic,expression
+210,surprised,expression
+211,shocked,expression
+212,astonished,expression
+213,wide eyes,expression
+214,open mouth,expression
+215,angry,expression
+216,frowning,expression
+217,furrowed brows,expression
+218,sharp gaze,expression
+219,intense gaze,expression
+220,blushing,expression
+221,embarrassed,expression
+222,bashful,expression
+223,shy,expression
+224,nervous,expression
+225,calm,expression
+226,relaxed,expression
+227,peaceful,expression
+228,dreamy,expression
+229,thoughtful,expression
+230,smirk,expression
+231,mischievous,expression
+232,playful,expression
+233,laughing,expression
+234,graceful smile,expression
+235,indoors,background
+236,outdoors,background
+237,cityscape,background
+238,forest,background
+239,mountains,background
+240,ocean,background
+241,beach,background
+242,sunset,background
+243,sunrise,background
+244,night,background
+245,rain,background
+246,snow,background
+247,autumn leaves,background
+248,spring flowers,background
+249,winter snow,background
+250,fantasy landscape,background
+251,sci-fi city,background
+252,cyberpunk city,background
+253,medieval town,background
+254,victorian streets,background
+255,castle,background
+256,temple,background
+257,ancient ruins,background
+258,studio background,background
+259,plain background,background
+260,gradient background,background
+261,bokeh background,background
+262,blurred background,background
+263,depth-of-field background,background
+264,dramatic lighting background,background
+265,volumetric lighting background,background
+266,backlight background,background
+267,soft lighting background,background
+268,rim light background,background
+269,sunlight background,background
+270,moonlight,background
+271,neon lights,background
+272,rain-soaked ground,background
+273,wet reflections,background
+274,mist,background
+275,fog,background
+276,floating particles,background
+277,lens flare background,background
