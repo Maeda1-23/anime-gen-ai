@@ -30,14 +30,14 @@ def test_gemini_connection(api_key: str) -> bool:
         result = client.test_connection()
 
         if result:
-            print("✓ Gemini API接続成功")
+            print("[OK] Gemini API接続成功")
             return True
         else:
-            print("✗ Gemini API接続失敗")
+            print("[NG] Gemini API接続失敗")
             return False
 
     except Exception as e:
-        print(f"✗ エラーが発生しました: {e}")
+        print(f"[NG] エラーが発生しました: {e}")
         return False
 
 def interactive_demo(client: GeminiClient):
@@ -256,7 +256,7 @@ def main():
     """メイン関数"""
     print("アニメ制作自動化システムを起動します...")
     print("Gemini APIを活用したアニメ制作ワークフロー自動化システム")
-    print("使用モデル: gemini-3-flash-preview")
+    print("使用モデル: gemini-2.0-flash-exp")
 
     # 環境変数の読み込み
     if load_dotenv:
