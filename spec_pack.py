@@ -335,3 +335,73 @@ SpecPack(JSON):
                     "replace": []
                 }
             }
+
+    def apply_tag_patch(
+        self,
+        current_prompt: str,
+        patch: dict,
+        mutation_pool: dict[str, list[str]],
+        base_tags: list[str],
+        quality_tags: list[str] = None
+    ) -> list[str]:
+        """tag_patchをプロンプトに適用
+
+        Args:
+            current_prompt: 現在のプロンプト
+            patch: 評価結果のtag_patch
+            mutation_pool: タグプール
+            base_tags: 基本タグ
+            quality_tags: 品質タグ
+
+        Returns:
+            修正後のタグリスト
+        """
+        if quality_tags is None:
+            quality_tags = []
+
+        allowed = set()
+        for tags in mutation_pool.values():
+            allowed.update(tags)
+        allowed.update(base_tags)
+
+        # prompt -> list[str]
+        cur_tags = [t.strip() for t in current_prompt.split(",") if t.strip()]
+        # qualityタグを除外
+        cur_tags = [t for t in cur_tags if t not in quality_tags]
+
+        remove = set(patch.get("remove", []) or [])
+        add = patch.get("add", []) or []
+        repl = patch.get("replace", []) or []
+
+        # remove
+        cur_tags = [t for t in cur_tags if t not in remove]
+
+        # replace
+        for r in repl:
+            f = (r or {}).get("from")
+            t = (r or {}).get("to")
+            if not f or not t:
+                continue
+            cur_tags = [t if x == f else x for x in cur_tags]
+
+        # add
+        for t in add:
+            if t and t not in cur_tags:
+                cur_tags.append(t)
+
+        # base_tags を強制的に先頭に揃える
+        out = []
+        seen = set()
+        for t in base_tags:
+            if t not in seen:
+                out.append(t)
+                seen.add(t)
+        for t in cur_tags:
+            if t in seen:
+                continue
+            # allowed だけ通す（未知タグは落とす）
+            if t in allowed:
+                out.append(t)
+                seen.add(t)
+
+        return out

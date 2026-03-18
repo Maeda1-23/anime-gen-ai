@@ -152,6 +152,58 @@ class Individual:
         child._sanitize_tags()
         return child
 
+    def apply_tag_patch(self, patch: dict) -> "Individual":
+        """tag_patchを個体に適用
+
+        Args:
+            patch: tag_patch辞書
+
+        Returns:
+            tag_patch適用後の新しいIndividual
+        """
+        if not patch:
+            return self
+
+        remove = set(patch.get("remove", []) or [])
+        add = patch.get("add", []) or []
+        repl = patch.get("replace", []) or []
+
+        # remove
+        new_vars = {}
+        for cat, tags in self.variable_tags.items():
+            new_tags = [t for t in tags if t not in remove]
+            if new_tags:
+                new_vars[cat] = new_tags
+
+        # replace
+        for r in repl:
+            f = (r or {}).get("from")
+            t = (r or {}).get("to")
+            if not f or not t:
+                continue
+            for cat, tags in new_vars.items():
+                if f in tags:
+                    idx = tags.index(f)
+                    new_vars[cat][idx] = t
+
+        # add
+        for t in add:
+            if t and self.mutation_pool:
+                # 変異プールにないタグは追加しない
+                for cat, pool in self.mutation_pool.items():
+                    if t in pool:
+                        new_vars.setdefault(cat, []).append(t)
+                        break
+
+        # 新しいIndividualを作成
+        child = Individual(
+            base_tags=self.base_tags.copy(),
+            variable_tags=new_vars,
+            mutation_pool=self.mutation_pool,
+            quality_suffix=self.quality_suffix
+        )
+        return child
+
     @classmethod
     def crossover(cls, parent1: "Individual", parent2: "Individual") -> "Individual":
         """交叉操作: 両親のvariable_tagsを混ぜて子を作成

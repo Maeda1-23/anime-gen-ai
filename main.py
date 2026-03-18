@@ -227,7 +227,10 @@ def slide_workflow_mode():
                     "seed": seed,
                     "image_path": image_path,
                     "score": score,
-                    "selected": False
+                    "selected": False,
+                    "breakdown": breakdown,
+                    "violations": violations,
+                    "tag_patch": tag_patch
                 })
 
             except Exception as e:
@@ -238,7 +241,10 @@ def slide_workflow_mode():
                     "seed": seed,
                     "image_path": None,
                     "score": 0.0,
-                    "selected": False
+                    "selected": False,
+                    "breakdown": {},
+                    "violations": [],
+                    "tag_patch": {}
                 })
 
         # 選択フェーズ
@@ -250,8 +256,23 @@ def slide_workflow_mode():
             sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
             num_survivors = max(2, len(results) // 2)
 
+            # tag_patchを適用して個体を修正
+            modified_survivors = []
             for i in range(num_survivors):
-                survivors.append(sorted_results[i]["individual"])
+                result = sorted_results[i]
+                individual = result["individual"]
+                tag_patch = result.get("tag_patch", {})
+
+                if tag_patch:
+                    # tag_patchを個体に適用
+                    modified_individual = individual.apply_tag_patch(tag_patch)
+                    modified_survivors.append(modified_individual)
+                else:
+                    modified_survivors.append(individual)
+
+            survivors = modified_survivors
+
+            for i in range(num_survivors):
                 sorted_results[i]["selected"] = True
 
             print(f"VLMが{num_survivors}個を選択しました")
