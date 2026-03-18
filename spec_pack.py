@@ -279,36 +279,27 @@ SpecPack(JSON):
 # 出力は JSONのみ（説明文禁止）
 スキーマ:
 {{
-  "total_score": 0.0,
-  "breakdown": {{
-    "appearance": 0,
-    "expression": 0,
-    "pose": 0,
-    "background": 0,
-    "anti_noise": 0
+  "total": 0,
+  "scores": {{
+    "character_appearance": {{"score": 0, "rationale": ""}},
+    "pose_composition_spatial": {{"score": 0, "rationale": ""}},
+    "background_environment_props": {{"score": 0, "rationale": ""}},
+    "color_lighting_atmosphere": {{"score": 0, "rationale": ""}}
   }},
-  "violations": ["..."],
-  "tag_patch": {{
-    "add": ["tag1", "tag2"],
-    "remove": ["tag3"],
-    "replace": [{{"from": "tag_old", "to": "tag_new"}}]
-  }}
+  "good_points": ["..."],
+  "bad_points": ["..."],
+  "critical_mismatches": ["..."]
 }}
 
-# ルール
-- total_score は 0.0〜1.0（高いほど良い）
-- violations は最大8件、短く
-- tag_patch は「最小修正」で。追加/削除/置換のどれかは必ず入れる
-- prohibited が破られている（文字/ロゴ/透かし等）場合は anti_noise を下げ、remove/negative寄りの修正を提案
-
 # スコア基準（厳格に評価）
-- 各項目は0.0〜1.0の範囲で評価
-- must項目が1つでも欠けている場合は重大な減点（0.2以下）
-- prohibited項目が1つでもある場合はanti_noiseを0.0とする
-- 品質が非常に良い場合でも1.0を超えることはない
-- 平均的な品質は0.4〜0.6程度
-- 優れた品質は0.7〜0.8程度
-- 完璧な品質は0.9〜1.0程度
+- 各カテゴリは0〜10の範囲で評価
+- totalは4カテゴリの合計（0〜40）
+- 合格条件: 各カテゴリ7点以上、かつ合計36点以上
+- must項目が1つでも欠けている場合は重大な減点（3点以下）
+- prohibited項目が1つでもある場合は該当カテゴリを下げる
+- 平均的な品質は各カテゴリ4〜6点程度
+- 優れた品質は各カテゴリ7〜8点程度
+- 完璧な品質は各カテゴリ9〜10点程度
 """
 
         # Geminiで評価（温度0で決定的）
@@ -316,24 +307,38 @@ SpecPack(JSON):
         json_text = self._extract_json(response_text)
 
         if json_text:
-            return json.loads(json_text)
+            evaluation = json.loads(json_text)
+            # 合格条件のチェック
+            scores = evaluation.get("scores", {})
+            character_appearance = scores.get("character_appearance", {}).get("score", 0)
+            pose_composition_spatial = scores.get("pose_composition_spatial", {}).get("score", 0)
+            background_environment_props = scores.get("background_environment_props", {}).get("score", 0)
+            color_lighting_atmosphere = scores.get("color_lighting_atmosphere", {}).get("score", 0)
+
+            passed = (
+                character_appearance >= 7 and
+                pose_composition_spatial >= 7 and
+                background_environment_props >= 7 and
+                color_lighting_atmosphere >= 7 and
+                evaluation.get("total", 0) >= 36
+            )
+
+            evaluation["passed"] = passed
+            return evaluation
         else:
             # デフォルト評価
             return {
-                "total_score": 0.5,
-                "breakdown": {
-                    "appearance": 0.5,
-                    "expression": 0.5,
-                    "pose": 0.5,
-                    "background": 0.5,
-                    "anti_noise": 0.5
+                "total": 20,
+                "scores": {
+                    "character_appearance": {"score": 5, "rationale": "JSON解析失敗"},
+                    "pose_composition_spatial": {"score": 5, "rationale": "JSON解析失敗"},
+                    "background_environment_props": {"score": 5, "rationale": "JSON解析失敗"},
+                    "color_lighting_atmosphere": {"score": 5, "rationale": "JSON解析失敗"}
                 },
-                "violations": ["JSON解析失敗"],
-                "tag_patch": {
-                    "add": [],
-                    "remove": [],
-                    "replace": []
-                }
+                "good_points": ["解析失敗"],
+                "bad_points": ["解析失敗"],
+                "critical_mismatches": ["JSON解析失敗"],
+                "passed": False
             }
 
     def apply_tag_patch(

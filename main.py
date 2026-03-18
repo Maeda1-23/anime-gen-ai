@@ -200,37 +200,56 @@ def slide_workflow_mode():
                         specpack=specpack,
                         current_prompt=prompt
                     )
-                    score = evaluation.get("total_score", 0.5)
-                    breakdown = evaluation.get("breakdown", {})
-                    violations = evaluation.get("violations", [])
-                    tag_patch = evaluation.get("tag_patch", {})
+                    total_score = evaluation.get("total", 0)
+                    scores = evaluation.get("scores", {})
+                    passed = evaluation.get("passed", False)
+                    good_points = evaluation.get("good_points", [])
+                    bad_points = evaluation.get("bad_points", [])
+                    critical_mismatches = evaluation.get("critical_mismatches", [])
+
+                    # 各カテゴリのスコアを取得
+                    character_appearance = scores.get("character_appearance", {}).get("score", 0)
+                    pose_composition_spatial = scores.get("pose_composition_spatial", {}).get("score", 0)
+                    background_environment_props = scores.get("background_environment_props", {}).get("score", 0)
+                    color_lighting_atmosphere = scores.get("color_lighting_atmosphere", {}).get("score", 0)
                 except Exception as e:
                     print(f"    [警告] SpecPack評価失敗: {e}、デフォルト評価を使用")
                     analysis = gemini_client.analyze_image_detailed(image_path)
-                    score = analysis.get("quality_assessment", 5.0) / 10.0
-                    breakdown = {}
-                    violations = []
-                    tag_patch = {}
+                    total_score = analysis.get("quality_assessment", 5.0) * 4  # 0-40点に変換
+                    character_appearance = analysis.get("quality_assessment", 5.0)
+                    pose_composition_spatial = analysis.get("quality_assessment", 5.0)
+                    background_environment_props = analysis.get("quality_assessment", 5.0)
+                    color_lighting_atmosphere = analysis.get("quality_assessment", 5.0)
+                    passed = False
+                    good_points = []
+                    bad_points = ["解析失敗"]
+                    critical_mismatches = []
 
                 print(f"    -> {image_path}")
-                print(f"    スコア: {score:.2f}/10")
-                if breakdown:
-                    print(f"    内訳: {breakdown}")
-                if violations:
-                    print(f"    違反: {violations}")
-                if tag_patch:
-                    print(f"    修正案: {tag_patch}")
+                print(f"    スコア: {total_score:.0f}/40 (合格: {'はい' if passed else 'いいえ'})")
+                print(f"    内訳: キャラクター{character_appearance:.0f}/10, ポーズ{pose_composition_spatial:.0f}/10, 背景{background_environment_props:.0f}/10, 色・光{color_lighting_atmosphere:.0f}/10")
+                if good_points:
+                    print(f"    良い点: {good_points}")
+                if bad_points:
+                    print(f"    悪い点: {bad_points}")
+                if critical_mismatches:
+                    print(f"    重大な不一致: {critical_mismatches}")
 
                 results.append({
                     "individual": indiv,
                     "prompt": prompt,
                     "seed": seed,
                     "image_path": image_path,
-                    "score": score,
+                    "total_score": total_score,
+                    "passed": passed,
                     "selected": False,
-                    "breakdown": breakdown,
-                    "violations": violations,
-                    "tag_patch": tag_patch
+                    "character_appearance": character_appearance,
+                    "pose_composition_spatial": pose_composition_spatial,
+                    "background_environment_props": background_environment_props,
+                    "color_lighting_atmosphere": color_lighting_atmosphere,
+                    "good_points": good_points,
+                    "bad_points": bad_points,
+                    "critical_mismatches": critical_mismatches
                 })
 
             except Exception as e:
@@ -240,11 +259,16 @@ def slide_workflow_mode():
                     "prompt": prompt,
                     "seed": seed,
                     "image_path": None,
-                    "score": 0.0,
+                    "total_score": 0,
+                    "passed": False,
                     "selected": False,
-                    "breakdown": {},
-                    "violations": [],
-                    "tag_patch": {}
+                    "character_appearance": 0,
+                    "pose_composition_spatial": 0,
+                    "background_environment_props": 0,
+                    "color_lighting_atmosphere": 0,
+                    "good_points": [],
+                    "bad_points": ["エラー"],
+                    "critical_mismatches": []
                 })
 
         # 選択フェーズ
@@ -253,22 +277,36 @@ def slide_workflow_mode():
         if use_vl:
             # VLMによる自動選択
             print("\nVLMによる自動選択を実行...")
-            sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
+            sorted_results = sorted(results, key=lambda x: x["total_score"], reverse=True)
             num_survivors = max(2, len(results) // 2)
+
+            # 合格条件をチェック
+            best_result = sorted_results[0]
+            if best_result["passed"]:
+                print(f"\n[合格条件を達成しました！]")
+                print(f"  合計スコア: {best_result['total_score']:.0f}/40")
+                print(f"  キャラクター: {best_result['character_appearance']:.0f}/10")
+                print(f"  ポーズ: {best_result['pose_composition_spatial']:.0f}/10")
+                print(f"  背景: {best_result['background_environment_props']:.0f}/10")
+                print(f"  色・光: {best_result['color_lighting_atmosphere']:.0f}/10")
+                return  # 合格した場合は終了
 
             # tag_patchを適用して個体を修正
             modified_survivors = []
             for i in range(num_survivors):
                 result = sorted_results[i]
                 individual = result["individual"]
-                tag_patch = result.get("tag_patch", {})
 
-                if tag_patch:
-                    # tag_patchを個体に適用
-                    modified_individual = individual.apply_tag_patch(tag_patch)
-                    modified_survivors.append(modified_individual)
-                else:
-                    modified_survivors.append(individual)
+                # VLMのフィードバックを考慮して個体を修正
+                modified_individual = individual
+                if result["good_points"]:
+                    # 良い点を維持
+                    modified_individual = individual
+                if result["bad_points"] or result["critical_mismatches"]:
+                    # 悪い点や重大な不一致がある場合は変異を適用
+                    modified_individual = individual.mutate()
+
+                modified_survivors.append(modified_individual)
 
             survivors = modified_survivors
 
@@ -290,10 +328,12 @@ def slide_workflow_mode():
 
                 print(f"\nペア {i // PAIR_SIZE}:")
                 print(f"  0: {r1['prompt']}")
-                print(f"     スコア: {r1['score']:.2f}/10")
+                print(f"     合計スコア: {r1['total_score']:.0f}/40")
+                print(f"     合格: {'はい' if r1['passed'] else 'いいえ'}")
                 print(f"     画像: {r1['image_path']}")
                 print(f"  1: {r2['prompt']}")
-                print(f"     スコア: {r2['score']:.2f}/10")
+                print(f"     合計スコア: {r2['total_score']:.0f}/40")
+                print(f"     合格: {'はい' if r2['passed'] else 'いいえ'}")
                 print(f"     画像: {r2['image_path']}")
 
                 choice = input("選択 (0-1, qで終了): ").strip().lower()
@@ -435,20 +475,42 @@ def full_workflow_mode():
                     output_dir=gen_dir
                 )
 
-                # Geminiで画像分析
+                # Geminiで画像分析（ajiokaの4カテゴリ評価）
                 analysis = gemini_client.analyze_image_detailed(image_path)
-                score = analysis.get("quality_assessment", 5.0) / 10.0
+
+                # quality_assessmentから4カテゴリのスコアを推定
+                quality = analysis.get("quality_assessment", 5.0)
+                total_score = int(quality * 4)  # 0-40点に変換
+                character_appearance = int(quality)
+                pose_composition_spatial = int(quality)
+                background_environment_props = int(quality)
+                color_lighting_atmosphere = int(quality)
+
+                # 合格条件のチェック
+                passed = (
+                    character_appearance >= 7 and
+                    pose_composition_spatial >= 7 and
+                    background_environment_props >= 7 and
+                    color_lighting_atmosphere >= 7 and
+                    total_score >= 36
+                )
 
                 print(f"    -> {image_path}")
-                print(f"    スコア: {score:.2f}/10")
+                print(f"    スコア: {total_score}/40 (合格: {'はい' if passed else 'いいえ'})")
+                print(f"    内訳: キャラクター{character_appearance}/10, ポーズ{pose_composition_spatial}/10, 背景{background_environment_props}/10, 色・光{color_lighting_atmosphere}/10")
 
                 results.append({
                     "individual": indiv,
                     "prompt": prompt,
                     "seed": seed,
                     "image_path": image_path,
-                    "score": score,
-                    "selected": False
+                    "total_score": total_score,
+                    "passed": passed,
+                    "selected": False,
+                    "character_appearance": character_appearance,
+                    "pose_composition_spatial": pose_composition_spatial,
+                    "background_environment_props": background_environment_props,
+                    "color_lighting_atmosphere": color_lighting_atmosphere
                 })
 
             except Exception as e:
@@ -458,8 +520,13 @@ def full_workflow_mode():
                     "prompt": prompt,
                     "seed": seed,
                     "image_path": None,
-                    "score": 0.0,
-                    "selected": False
+                    "total_score": 0,
+                    "passed": False,
+                    "selected": False,
+                    "character_appearance": 0,
+                    "pose_composition_spatial": 0,
+                    "background_environment_props": 0,
+                    "color_lighting_atmosphere": 0
                 })
 
         # 選択フェーズ
@@ -468,8 +535,19 @@ def full_workflow_mode():
         if use_vl:
             # VLMによる自動選択
             print("\nVLMによる自動選択を実行...")
-            sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
+            sorted_results = sorted(results, key=lambda x: x["total_score"], reverse=True)
             num_survivors = max(2, len(results) // 2)
+
+            # 合格条件をチェック
+            best_result = sorted_results[0]
+            if best_result["passed"]:
+                print(f"\n[合格条件を達成しました！]")
+                print(f"  合計スコア: {best_result['total_score']}/40")
+                print(f"  キャラクター: {best_result['character_appearance']}/10")
+                print(f"  ポーズ: {best_result['pose_composition_spatial']}/10")
+                print(f"  背景: {best_result['background_environment_props']}/10")
+                print(f"  色・光: {best_result['color_lighting_atmosphere']}/10")
+                return  # 合格した場合は終了
 
             for i in range(num_survivors):
                 survivors.append(sorted_results[i]["individual"])
@@ -490,10 +568,12 @@ def full_workflow_mode():
 
                 print(f"\nペア {i // PAIR_SIZE}:")
                 print(f"  0: {r1['prompt']}")
-                print(f"     スコア: {r1['score']:.2f}/10")
+                print(f"     合計スコア: {r1['total_score']:.0f}/40")
+                print(f"     合格: {'はい' if r1['passed'] else 'いいえ'}")
                 print(f"     画像: {r1['image_path']}")
                 print(f"  1: {r2['prompt']}")
-                print(f"     スコア: {r2['score']:.2f}/10")
+                print(f"     合計スコア: {r2['total_score']:.0f}/40")
+                print(f"     合格: {'はい' if r2['passed'] else 'いいえ'}")
                 print(f"     画像: {r2['image_path']}")
 
                 choice = input("選択 (0-1, qで終了): ").strip().lower()
