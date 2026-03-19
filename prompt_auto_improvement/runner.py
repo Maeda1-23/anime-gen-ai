@@ -13,11 +13,13 @@ from .io_manager import ExperimentIO
 from .utils import extract_json
 from .prompts import (
     SpecPack,
+    PromptStyle,
     build_slide_analysis_prompt,
     build_specpack_extraction_prompt,
     build_image_judge_prompt,
     build_prompt_improve_prompt,
-    get_base_tags_from_specpack,
+    get_initial_prompt_from_specpack,
+    get_initial_negative_prompt,
     create_default_specpack,
 )
 
@@ -66,6 +68,10 @@ class ExperimentRunner:
         self.images_per_loop = images_per_loop
         self.prompt_format = prompt_format
         self.supports_negative = supports_negative
+        self.style = PromptStyle(
+            prompt_format=prompt_format,
+            supports_negative_prompt=supports_negative,
+        )
 
     @classmethod
     def from_app_config(cls, app_config: AppConfig, vlm: VLMClient, imggen: ImageGenerator) -> 'ExperimentRunner':
@@ -94,9 +100,10 @@ class ExperimentRunner:
         # SpecPackを抽出
         specpack = self._extract_specpack(slides)
 
-        # 基本タグを取得
-        base_tags = get_base_tags_from_specpack(specpack)
-        print(f"\n基本タグ: {', '.join(base_tags)}")
+        # 初期プロンプトを取得（フォーマット対応）
+        initial_positive = get_initial_prompt_from_specpack(specpack, self.style)
+        initial_negative = get_initial_negative_prompt(specpack, self.style)
+        print(f"\n初期プロンプト: {initial_positive}")
 
         # セッションを作成
         io = ExperimentIO(self.config.output_dir)
@@ -107,8 +114,8 @@ class ExperimentRunner:
         print(f"SpecPackを保存しました: {io.session_dir / 'specpack.json'}")
 
         # VLMベースのプロンプト改善ループ
-        current_positive = ", ".join(base_tags) + f", {QUALITY}"
-        current_negative = NEGATIVE_PROMPT
+        current_positive = f"{initial_positive}, {QUALITY}"
+        current_negative = initial_negative or NEGATIVE_PROMPT
 
         for loop_idx in range(self.max_loops):
             loop_dir = io.create_loop_dir(loop_idx)
@@ -194,7 +201,7 @@ class ExperimentRunner:
             slide_descriptions.append(desc)
 
         # SpecPack抽出プロンプトを構築
-        extraction_prompt = build_specpack_extraction_prompt(slide_descriptions)
+        extraction_prompt = build_specpack_extraction_prompt(slide_descriptions, self.style)
         response_text = self.vlm.generate(extraction_prompt, temperature=0.0)
         json_text = extract_json(response_text)
 
@@ -300,7 +307,7 @@ class ExperimentRunner:
 
     def _judge_image(self, image_path: Path, specpack: SpecPack, current_prompt: str) -> Dict:
         """画像をSpecPackに基づいて評価"""
-        prompt = build_image_judge_prompt(specpack, current_prompt)
+        prompt = build_image_judge_prompt(specpack, current_prompt, self.style)
         image = Image.open(image_path)
         response_text = self.vlm.generate(prompt, [image], temperature=0.0)
         json_text = extract_json(response_text)
@@ -382,8 +389,7 @@ class ExperimentRunner:
             per_image_results=per_image_results,
             avg_scores=avg_scores,
             passed=passed,
-            prompt_format=self.prompt_format,
-            supports_negative=self.supports_negative,
+            style=self.style,
         )
 
         response_text = self.vlm.generate(prompt, temperature=0.0)
@@ -395,7 +401,7 @@ class ExperimentRunner:
             positive = next_prompt.get("positive", current_positive)
             negative = next_prompt.get("negative", current_negative)
 
-            if not self.supports_negative:
+            if not self.style.supports_negative_prompt:
                 negative = None
 
             return {
@@ -408,7 +414,7 @@ class ExperimentRunner:
         else:
             return {
                 "positive": current_positive,
-                "negative": current_negative if self.supports_negative else None,
+                "negative": current_negative if self.style.supports_negative_prompt else None,
                 "changes": [],
                 "notes": "プロンプト改善に失敗しました。元のプロンプトを維持します。",
                 "loop_summary": {

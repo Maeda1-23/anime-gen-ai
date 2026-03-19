@@ -1,10 +1,19 @@
 # VLMプロンプトテンプレートとSpecPack定義
 
 import json
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Literal, Optional, Any
 from dataclasses import dataclass, asdict
 
 from .utils import compact_json
+
+
+# --- データクラス ---
+
+@dataclass(frozen=True)
+class PromptStyle:
+    """プロンプト形式の設定"""
+    prompt_format: Literal["natural", "tags"] = "tags"
+    supports_negative_prompt: bool = True
 
 
 @dataclass
@@ -21,6 +30,59 @@ class SpecPack:
         return asdict(self)
 
 
+# --- フォーマットヒント ---
+
+def _format_hint(style: PromptStyle) -> str:
+    """プロンプト形式のヒントを生成"""
+    if style.prompt_format == "tags":
+        return (
+            "プロンプト形式要件:\n"
+            "- カンマ区切りのタグで出力してください（例: 1girl, smile, anime style）\n"
+            "- 完全な文章を使用しないでください\n"
+            "- ピリオドを使用しないでください\n"
+        )
+    else:
+        return (
+            "プロンプト形式要件:\n"
+            "- 画像生成に適した自然な英語で出力してください\n"
+            "  （例: A beautiful anime girl with long blue hair smiling gently）\n"
+        )
+
+
+def _prompt_seed_schema(style: PromptStyle) -> str:
+    """prompt_seedのスキーマをフォーマットに合わせて生成"""
+    if style.prompt_format == "tags":
+        return (
+            '  "prompt_seed": {{\n'
+            '    "positive": "カンマ区切りのDanbooru風英語タグ",\n'
+            '    "negative": "ネガティブタグ"\n'
+            '  }}'
+        )
+    else:
+        return (
+            '  "prompt_seed": {{\n'
+            '    "positive": "画像生成に適した自然な英語の説明文",\n'
+            '    "negative": "ネガティブプロンプト（タグ形式でも可）"\n'
+            '  }}'
+        )
+
+
+def _prompt_seed_rules(style: PromptStyle) -> str:
+    """prompt_seedのルールをフォーマットに合わせて生成"""
+    if style.prompt_format == "tags":
+        return (
+            "- prompt_seed.positive はDanbooru風の英語タグに寄せて短く\n"
+            "- prompt_seed.negative は文字混入防止を中心に短く"
+        )
+    else:
+        return (
+            "- prompt_seed.positive は画像生成に適した自然な英語で記述\n"
+            "- prompt_seed.negative は文字混入防止を中心に短く"
+        )
+
+
+# --- プロンプトテンプレート ---
+
 def build_slide_analysis_prompt(slide_index: int) -> str:
     """スライド分析用のプロンプトを構築"""
     return (
@@ -29,12 +91,18 @@ def build_slide_analysis_prompt(slide_index: int) -> str:
     )
 
 
-def build_specpack_extraction_prompt(slide_descriptions: List[str]) -> str:
+def build_specpack_extraction_prompt(
+    slide_descriptions: List[str],
+    style: PromptStyle = PromptStyle()
+) -> str:
     """スライド内容からSpecPack抽出用のプロンプトを構築"""
     all_content = "\n\n".join([
         f"=== スライド{i+1} ===\n{desc}"
         for i, desc in enumerate(slide_descriptions)
     ])
+
+    seed_schema = _prompt_seed_schema(style)
+    seed_rules = _prompt_seed_rules(style)
 
     return f"""
 あなたは「アニメイラスト制作仕様書（スライド）」から、生成評価に使えるSpecPack(JSON)を作るアシスタントです。
@@ -74,17 +142,13 @@ def build_specpack_extraction_prompt(slide_descriptions: List[str]) -> str:
     {{"key": "background", "weight": 1, "check": "背景が一致している"}},
     {{"key": "anti_noise", "weight": 1, "check": "文字・ロゴ・透かし等が描かれていない"}}
   ],
-  "prompt_seed": {{
-    "positive_tags": "",
-    "negative_tags": ""
-  }}
+{seed_schema}
 }}
 
 # ルール
 - must/should の配列はユニーク化し、各配列は最大8項目
 - スライドの宛名/会社名/管理ID/ページ番号等は prohibited に寄せる
-- prompt_seed.positive_tags はDanbooru風の英語タグに寄せて短く
-- prompt_seed.negative_tags は文字混入防止を中心に短く
+{seed_rules}
 
 # スコア基準（厳格に評価）
 - 各項目は0.0〜1.0の範囲で評価
@@ -96,9 +160,18 @@ def build_specpack_extraction_prompt(slide_descriptions: List[str]) -> str:
 """
 
 
-def build_image_judge_prompt(specpack: SpecPack, current_prompt: str) -> str:
+def build_image_judge_prompt(
+    specpack: SpecPack,
+    current_prompt: str,
+    style: PromptStyle = PromptStyle()
+) -> str:
     """画像評価用のプロンプトを構築"""
     spec_json = compact_json(specpack.to_dict())
+
+    if style.prompt_format == "tags":
+        prompt_label = "現在のprompt(tags)"
+    else:
+        prompt_label = "現在のprompt(natural language)"
 
     return f"""
 あなたは画像生成の検査官です。与えられたSpecPackを唯一の正解基準として、画像を採点し、修正案を返してください。
@@ -106,7 +179,7 @@ def build_image_judge_prompt(specpack: SpecPack, current_prompt: str) -> str:
 SpecPack(JSON):
 {spec_json}
 
-現在のprompt(tags):
+{prompt_label}:
 {current_prompt}
 
 # 出力は JSONのみ（説明文禁止）
@@ -143,8 +216,7 @@ def build_prompt_improve_prompt(
     per_image_results: List[Dict],
     avg_scores: Dict,
     passed: bool,
-    prompt_format: str = "tags",
-    supports_negative: bool = True
+    style: PromptStyle = PromptStyle(),
 ) -> str:
     """プロンプト改善用のプロンプトを構築"""
     spec_json = compact_json(specpack.to_dict())
@@ -157,23 +229,12 @@ def build_prompt_improve_prompt(
         else "合格条件を達成していません。チェックリストに従うようにプロンプトを改善してください。"
     )
 
-    if supports_negative:
+    if style.supports_negative_prompt:
         neg_rule = "- ネガティブプロンプトを調整しても構いません。\n"
     else:
         neg_rule = "- ネガティブプロンプトは出力しないでください（nullに設定）。\n"
 
-    if prompt_format == "tags":
-        format_hint = (
-            "プロンプト形式要件:\n"
-            "- ポジティブプロンプトをカンマ区切りのタグで出力してください。\n"
-            "- 完全な文章を使用しないでください。\n"
-            "- ピリオドを使用しないでください。\n"
-        )
-    else:
-        format_hint = (
-            "プロンプト形式要件:\n"
-            "- ポジティブプロンプトを画像生成に適した自然な英語で出力してください。\n"
-        )
+    format_hint = _format_hint(style)
 
     return f"""
 あなたはプロンプトエンジニアリングとアートディレクションの専門家です。
@@ -231,8 +292,95 @@ def build_prompt_improve_prompt(
 """
 
 
+# --- 初期プロンプト生成用のVLMプロンプト ---
+
+def build_init_prompt_instruction(
+    specpack: SpecPack,
+    style: PromptStyle = PromptStyle()
+) -> str:
+    """SpecPackから初期プロンプトをVLMに生成させるための指示を構築
+
+    SpecPackのprompt_seedが不十分な場合に、VLMでより良い初期プロンプトを生成する。
+    """
+    spec_json = compact_json(specpack.to_dict())
+    format_hint = _format_hint(style)
+
+    neg_instruction = ""
+    if style.supports_negative_prompt:
+        neg_instruction = '  "negative": "ネガティブプロンプト",'
+    else:
+        neg_instruction = '  "negative": null,'
+
+    return f"""
+あなたは画像生成プロンプトの専門家です。
+以下のSpecPack（仕様書）を読み、画像生成に最適なプロンプトを作成してください。
+
+{format_hint}
+
+SpecPack:
+{spec_json}
+
+以下のJSONスキーマで出力してください:
+{{
+  "positive": "ポジティブプロンプト",
+{neg_instruction}
+  "reasoning": "プロンプト構成の理由"
+}}
+
+# ルール
+- must項目は必ず含めてください
+- should項目はできるだけ含めてください
+- prohibited項目に関連する内容は含めないでください
+- 品質向上タグ（masterpiece, best qualityなど）は含めないでください（別途追加されます）
+"""
+
+
+# --- SpecPackからプロンプトを取得 ---
+
+def get_initial_prompt_from_specpack(specpack: SpecPack, style: PromptStyle = PromptStyle()) -> str:
+    """SpecPackから初期ポジティブプロンプトを取得
+
+    Args:
+        specpack: SpecPackオブジェクト
+        style: プロンプトスタイル
+
+    Returns:
+        初期ポジティブプロンプト文字列
+    """
+    positive = specpack.prompt_seed.get("positive", "") or specpack.prompt_seed.get("positive_tags", "")
+
+    if positive:
+        return positive
+
+    # prompt_seedが空の場合、mustからタグを構築
+    tags = []
+    if specpack.must.get("character"):
+        tags.extend(specpack.must["character"])
+    if specpack.must.get("style"):
+        tags.extend(specpack.must["style"])
+    for key in ["appearance", "expression", "pose", "background"]:
+        if specpack.must.get(key):
+            tags.extend(specpack.must[key])
+
+    if style.prompt_format == "tags":
+        return ", ".join(tags) if tags else "1girl, solo, anime style"
+    else:
+        # natural形式: タグリストから自然な文に変換は難しいので、タグを連結して返す
+        # VLMによる改善ループで自然な文に変換される
+        return ", ".join(tags) if tags else "An anime-style girl"
+
+
+def get_initial_negative_prompt(specpack: SpecPack, style: PromptStyle = PromptStyle()) -> Optional[str]:
+    """SpecPackから初期ネガティブプロンプトを取得"""
+    if not style.supports_negative_prompt:
+        return None
+
+    negative = specpack.prompt_seed.get("negative", "") or specpack.prompt_seed.get("negative_tags", "")
+    return negative or None
+
+
 def get_base_tags_from_specpack(specpack: SpecPack) -> List[str]:
-    """SpecPackから基本タグを取得"""
+    """SpecPackから基本タグを取得（後方互換性用）"""
     base_tags = []
 
     if specpack.must.get("character"):
@@ -241,8 +389,9 @@ def get_base_tags_from_specpack(specpack: SpecPack) -> List[str]:
     if specpack.must.get("style"):
         base_tags.extend(specpack.must["style"])
 
-    if specpack.prompt_seed.get("positive_tags"):
-        seed_tags = [t.strip() for t in specpack.prompt_seed["positive_tags"].split(",")]
+    positive = specpack.prompt_seed.get("positive_tags", "") or specpack.prompt_seed.get("positive", "")
+    if positive:
+        seed_tags = [t.strip() for t in positive.split(",")]
         for tag in seed_tags:
             if tag and tag not in base_tags:
                 base_tags.append(tag)
@@ -284,7 +433,7 @@ def create_default_specpack() -> SpecPack:
             {"key": "anti_noise", "weight": 1, "check": "文字・ロゴ・透かし等が描かれていない"}
         ],
         prompt_seed={
-            "positive_tags": "1girl, solo, anime style",
-            "negative_tags": "text, logo, watermark"
+            "positive": "1girl, solo, anime style",
+            "negative": "text, logo, watermark"
         }
     )

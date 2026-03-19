@@ -3,6 +3,7 @@
 
 from prompt_auto_improvement.prompts import (
     SpecPack,
+    PromptStyle,
     get_base_tags_from_specpack,
     create_default_specpack,
 )
@@ -16,6 +17,10 @@ class SpecPackExtractor:
         self.client = gemini_client
         self.prompt_format = prompt_format
         self.supports_negative = supports_negative
+        self.style = PromptStyle(
+            prompt_format=prompt_format,
+            supports_negative_prompt=supports_negative,
+        )
 
     def extract_from_slides(self, slide_paths, max_new_tokens=1024):
         from prompt_auto_improvement.prompts import (
@@ -32,7 +37,7 @@ class SpecPackExtractor:
             )
             slide_descriptions.append(desc)
 
-        prompt = build_specpack_extraction_prompt(slide_descriptions)
+        prompt = build_specpack_extraction_prompt(slide_descriptions, self.style)
         response_text = self.client.generate_text(prompt, temperature=0.0)
         json_text = extract_json(response_text)
 
@@ -49,7 +54,7 @@ class SpecPackExtractor:
         from prompt_auto_improvement.prompts import build_image_judge_prompt
         import json
 
-        prompt = build_image_judge_prompt(specpack, current_prompt)
+        prompt = build_image_judge_prompt(specpack, current_prompt, self.style)
         response_text = self.client.generate_text(prompt, temperature=0.0)
         json_text = extract_json(response_text)
 
@@ -94,8 +99,7 @@ class SpecPackExtractor:
             per_image_results=per_image_results,
             avg_scores=avg_scores,
             passed=passed,
-            prompt_format=self.prompt_format,
-            supports_negative=self.supports_negative,
+            style=self.style,
         )
 
         response_text = self.client.generate_text(prompt, temperature=0.0)
