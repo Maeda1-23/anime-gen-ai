@@ -7,13 +7,13 @@ from pathlib import Path
 
 from .utils import load_api_key
 from .config import AppConfig, load_config
-from .vlm.gemini_api import GeminiVLM
-from .imggen.comfyui import ComfyUIGenerator
+from .vlm import create_vlm
+from .imggen import create_imggen
 from .runner import ExperimentRunner
 
 
-def _build_vlm(app_config: AppConfig):
-    """設定からVLMクライアントを構築"""
+def _resolve_api_key(app_config: AppConfig) -> str:
+    """VLM用のAPIキーを解決"""
     vlm_cfg = app_config.vlm
 
     if vlm_cfg.provider == "gemini":
@@ -24,9 +24,27 @@ def _build_vlm(app_config: AppConfig):
         if not api_key:
             print(f"エラー: 環境変数 {api_key_env} が設定されていません")
             sys.exit(1)
-        return GeminiVLM(api_key, model_name=vlm_cfg.gemini.model)
+        return api_key
     else:
-        print(f"エラー: 未対応のVLMプロバイダ: {vlm_cfg.provider}")
+        return ""
+
+
+def _build_vlm(app_config: AppConfig):
+    """設定からVLMクライアントを構築"""
+    vlm_cfg = app_config.vlm
+    api_key = _resolve_api_key(app_config)
+
+    try:
+        if vlm_cfg.provider == "gemini":
+            return create_vlm(
+                vlm_cfg.provider,
+                api_key=api_key,
+                model_name=vlm_cfg.gemini.model,
+            )
+        else:
+            return create_vlm(vlm_cfg.provider)
+    except ValueError as e:
+        print(f"エラー: {e}")
         sys.exit(1)
 
 
@@ -34,10 +52,13 @@ def _build_imggen(app_config: AppConfig):
     """設定から画像生成器を構築"""
     ig_cfg = app_config.image_generator
 
-    if ig_cfg.provider == "comfyui":
-        return ComfyUIGenerator(ig_cfg.comfyui)
-    else:
-        print(f"エラー: 未対応の画像生成プロバイダ: {ig_cfg.provider}")
+    try:
+        if ig_cfg.provider == "comfyui":
+            return create_imggen(ig_cfg.provider, config=ig_cfg.comfyui)
+        else:
+            return create_imggen(ig_cfg.provider)
+    except ValueError as e:
+        print(f"エラー: {e}")
         sys.exit(1)
 
 
